@@ -103,7 +103,7 @@ namespace test
                     public static extern void Method2(int param, double[] values);
                 }";
 
-            var processedSource = Process(source);
+            var processedSource = Process(source, mangle: false);
 
             foreach (var name in methodNames)
             {
@@ -127,11 +127,11 @@ namespace test
                     [DllImport]
                     public static extern void Method1(out int val);
                     [DllImport]
-                    public static extern void Method2(ref int param);
+                    public static extern void Method2(int param1, ref int param2);
                 }";
-            var processedSource = Process(source);
+            var processedSource = Process(source, mangle: false);
             var method1 = "public static void Method1(out int val) => s_Method1_t(out val);";
-            var method2 = "public static void Method2(ref int param) => s_Method2_t(ref param);";
+            var method2 = "public static void Method2(int param1, ref int param2) => s_Method2_t(param1, ref param2);";
 
             Assert.Contains(method1, processedSource);
             Assert.Contains(method2, processedSource);

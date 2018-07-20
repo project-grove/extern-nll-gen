@@ -13,7 +13,7 @@ namespace extern_nll_gen
     {
         internal const string LoadFunctionName = "__LoadFunction";
 
-        public static string Process(string source)
+        public static string Process(string source, bool mangle = true)
         {
             var nodes = Parse(source);
             // Step 1 - add necessary usings
@@ -24,11 +24,11 @@ namespace extern_nll_gen
             var classNames = new HashSet<string>();
             var externMethod = NextExternMethod(nodes);
             while (externMethod != null)
-            { 
+            {
                 var parent = externMethod.Parent as ClassDeclarationSyntax;
                 classNames.Add(parent.Identifier.Text);
                 var newParent = parent.RemoveNode(externMethod, SyntaxRemoveOptions.KeepNoTrivia);
-                foreach (var member in CreateMethodPointer(externMethod))
+                foreach (var member in CreateMethodPointer(externMethod, mangle))
                     newParent = newParent.AddMembers(member);
                 nodes = nodes.ReplaceNode(parent, newParent);
                 externMethod = NextExternMethod(nodes);
@@ -68,11 +68,12 @@ namespace extern_nll_gen
                     .Select(modifier => modifier.Text)
                     .Contains("extern"));
 
-        // TODO Check
-        internal static IEnumerable<MemberDeclarationSyntax> CreateMethodPointer(MethodDeclarationSyntax source)
+        internal static IEnumerable<MemberDeclarationSyntax> CreateMethodPointer(
+            MethodDeclarationSyntax source,
+            bool mangle)
         {
             var methodName = source.Identifier.Text; // TODO Read from DllImport if specified
-            var delegateTypeName = source.Identifier.Text + "_t";
+            var delegateTypeName = mangle ? Mangle(source) : source.Identifier.Text + "_t";
             var fieldName = "s_" + delegateTypeName;
 
             // private delegate T MethodName_t(...);
@@ -241,5 +242,20 @@ namespace extern_nll_gen
                 SyntaxFactory.InvocationExpression(
                     SyntaxFactory.IdentifierName(identifier),
                     FromParams(parameters)));
+
+        internal static string Mangle(MethodDeclarationSyntax method)
+        {
+            var methodName = method.Identifier.Text;
+            var paramTypes = method.ParameterList.ChildNodes()
+                .Select(n => n as ParameterSyntax)
+                .Where(n => n != null)
+                .Select(p => Slugify(p.Type.ToString().Replace('*', 'P')));
+            return $"{methodName}_{string.Join('_', paramTypes)}_t";
+        }
+
+        internal static string Slugify(string str) =>
+            new string(str.ToCharArray()
+                .Select(c => (char.IsLetterOrDigit(c) || c == '_') ? c : '_')
+                .ToArray());
     }
 }
