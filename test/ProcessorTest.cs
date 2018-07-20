@@ -39,11 +39,14 @@ namespace test
                 {
                     [DllImport]
                     public static extern void myNativeMethod(int param, double[] values);
+
+                    [DllImport]
+                    public static extern void myNativeMethod2(int param, double[] values);
                     
                     public static void OtherMethod() {}
                 }";
             var methods = GetExternMethods(Parse(source).DescendantNodes());
-            Assert.Single(methods);
+            Assert.Equal(2, methods.Count());
         }
 
         [Fact]
@@ -90,22 +93,29 @@ namespace test
         [Fact]
         public void ShouldTransformExternMethods()
         {
+            var methodNames = new[] { "Method1", "Method2" };
             var source = @"
                 public static class NativeClass
                 {
                     [DllImport]
-                    public static extern void Method(int param, double[] values);
+                    public static extern void Method1(int param, double[] values);
+                    [DllImport]
+                    public static extern void Method2(int param, double[] values);
                 }";
-            var @delegate = "private delegate void Method_t(int param, double[] values);";
-            var field = "private static Method_t s_Method_t = " +
-                    $"{Processor.LoadFunctionName}<Method_t>(\"Method\");";
-            var method = "public static void Method(int param, double[] values) => s_Method_t(param, values);";
 
             var processedSource = Process(source);
 
-            Assert.Contains(@delegate, processedSource);
-            Assert.Contains(field, processedSource);
-            Assert.Contains(method, processedSource);
+            foreach (var name in methodNames)
+            {
+                var @delegate = $"private delegate void {name}_t(int param, double[] values);";
+                var field = $"private static {name}_t s_{name}_t = " +
+                        $"{Processor.LoadFunctionName}<{name}_t>(\"{name}\");";
+                var method = $"public static void {name}(int param, double[] values) => s_{name}_t(param, values);";
+                
+                Assert.Contains(@delegate, processedSource);
+                Assert.Contains(field, processedSource);
+                Assert.Contains(method, processedSource);
+            }
         }
 
         // TODO Test DllImport function names

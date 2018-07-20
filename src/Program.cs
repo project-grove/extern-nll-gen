@@ -16,6 +16,7 @@ namespace extern_nll_gen
             var path = string.Join(' ', args);
             var source = File.ReadAllText(path);
             var output = Processor.Process(source);
+            Console.WriteLine(output);
         }
     }
 }

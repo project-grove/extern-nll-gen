@@ -21,17 +21,17 @@ namespace extern_nll_gen
                 SyntaxFactory.ParseName("NativeLibraryLoader")));
 
             // Step 2 - get all extern methods and replace them
-            var externMethods = GetExternMethods(nodes.DescendantNodes());
             var classNames = new HashSet<string>();
-            foreach (var externMethod in externMethods)
-            {
+            var externMethod = NextExternMethod(nodes);
+            while (externMethod != null)
+            { 
                 var parent = externMethod.Parent as ClassDeclarationSyntax;
                 classNames.Add(parent.Identifier.Text);
-                nodes = nodes.RemoveNode(parent, SyntaxRemoveOptions.KeepNoTrivia);
-                parent = parent.RemoveNode(externMethod, SyntaxRemoveOptions.KeepNoTrivia);
+                var newParent = parent.RemoveNode(externMethod, SyntaxRemoveOptions.KeepNoTrivia);
                 foreach (var member in CreateMethodPointer(externMethod))
-                    parent = parent.AddMembers(member);
-                nodes = nodes.AddMembers(parent);
+                    newParent = newParent.AddMembers(member);
+                nodes = nodes.ReplaceNode(parent, newParent);
+                externMethod = NextExternMethod(nodes);
             }
 
             // Step 3 - generate loader function stub in each parent class
@@ -39,16 +39,20 @@ namespace extern_nll_gen
                 .Where(node => node is ClassDeclarationSyntax)
                 .Select(node => (ClassDeclarationSyntax)node)
                 .Where(c => classNames.Contains(c.Identifier.Text));
+
             foreach (var parent in parentClasses)
             {
-                nodes = nodes.RemoveNode(parent, SyntaxRemoveOptions.KeepNoTrivia);
                 var newParent = parent.AddMembers(LoaderFunctionStub());
-                nodes = nodes.AddMembers(newParent);
+                nodes = nodes.ReplaceNode(parent, newParent);
             }
 
             // Step 4 - get the modified source
             return Formatter.Format(nodes, new AdhocWorkspace()).ToFullString();
         }
+
+        internal static MethodDeclarationSyntax NextExternMethod(CompilationUnitSyntax nodes) =>
+            GetExternMethods(nodes.DescendantNodes())
+                .FirstOrDefault();
 
         internal static CompilationUnitSyntax Parse(string source) =>
             (CSharpSyntaxTree
