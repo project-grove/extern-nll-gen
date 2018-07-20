@@ -118,6 +118,25 @@ namespace test
             }
         }
 
+        [Fact]
+        public void ShouldAddRefAndOutKeywordsIfNeeded()
+        {
+            var source = @"
+                public static class NativeClass
+                {
+                    [DllImport]
+                    public static extern void Method1(out int val);
+                    [DllImport]
+                    public static extern void Method2(ref int param);
+                }";
+            var processedSource = Process(source);
+            var method1 = "public static void Method1(out int val) => s_Method1_t(out val);";
+            var method2 = "public static void Method2(ref int param) => s_Method2_t(ref param);";
+
+            Assert.Contains(method1, processedSource);
+            Assert.Contains(method2, processedSource);
+        }
+
         // TODO Test DllImport function names
     }
 }

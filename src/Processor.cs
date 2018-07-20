@@ -201,15 +201,31 @@ namespace extern_nll_gen
                         null)),
                 Token(SyntaxKind.CloseParenToken));
 
-        internal static ArgumentListSyntax FromParams(ParameterListSyntax parameters)
+        internal static ArgumentListSyntax FromParams(ParameterListSyntax paramList)
         {
-            var nodes = parameters.ChildNodes();
-            var names = parameters.ChildNodes()
+            var parameters = paramList.ChildNodes()
                 .Select(n => n as ParameterSyntax)
-                .Select(p => p.Identifier.Text);
+                .Where(n => n != null);
             var arguments = SyntaxFactory.SeparatedList<ArgumentSyntax>(
-                    names.Select(name => SyntaxFactory.Argument(
-                        SyntaxFactory.IdentifierName(name))));
+                    parameters.Select(param =>
+                    {
+                        var name = param.Identifier.Text;
+                        var arg = SyntaxFactory.Argument(SyntaxFactory.IdentifierName(name));
+                        var modifier = param.Modifiers.FirstOrDefault();
+                        if (modifier != null)
+                        {
+                            switch (modifier.Text)
+                            {
+                                case "out":
+                                    arg = arg.WithRefKindKeyword(Token(SyntaxKind.OutKeyword));
+                                    break;
+                                case "ref":
+                                    arg = arg.WithRefKindKeyword(Token(SyntaxKind.RefKeyword));
+                                    break;
+                            }
+                        }
+                        return arg;
+                    }));
             return SyntaxFactory.ArgumentList(
                 Token(SyntaxKind.OpenParenToken),
                 arguments,
