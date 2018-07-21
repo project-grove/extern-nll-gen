@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,6 +13,7 @@ namespace extern_nll_gen
     public static class Processor
     {
         internal const string LoadFunctionName = "__LoadFunction";
+        private static Regex EntryPointRegex = new Regex(@"EntryPoint\s*=\s*[\\""]+([$a-zA-Z0-9_]*)[\\""]");
 
         public static string Process(string source, bool mangle = true)
         {
@@ -36,8 +38,7 @@ namespace extern_nll_gen
 
             // Step 3 - generate loader function stub in each parent class
             var parentClasses = nodes.DescendantNodes()
-                .Where(node => node is ClassDeclarationSyntax)
-                .Select(node => (ClassDeclarationSyntax)node)
+                .OfType<ClassDeclarationSyntax>()
                 .Where(c => classNames.Contains(c.Identifier.Text));
 
             foreach (var parent in parentClasses)
@@ -62,8 +63,7 @@ namespace extern_nll_gen
         internal static IEnumerable<MethodDeclarationSyntax> GetExternMethods(
             IEnumerable<SyntaxNode> nodes
             ) =>
-            nodes.Where(node => node is MethodDeclarationSyntax)
-                .Select(node => (MethodDeclarationSyntax)node)
+            nodes.OfType<MethodDeclarationSyntax>()
                 .Where(method => method.Modifiers
                     .Select(modifier => modifier.Text)
                     .Contains("extern"));
@@ -72,7 +72,8 @@ namespace extern_nll_gen
             MethodDeclarationSyntax source,
             bool mangle)
         {
-            var methodName = source.Identifier.Text; // TODO Read from DllImport if specified
+            var methodName = source.Identifier.Text;
+            var nativeMethodName = TryGetNativeName(source) ?? methodName;
             var delegateTypeName = mangle ? Mangle(source) : source.Identifier.Text + "_t";
             var fieldName = "s_" + delegateTypeName;
 
@@ -92,7 +93,7 @@ namespace extern_nll_gen
                     SyntaxFactory.GenericName(
                         Identifier(LoadFunctionName),
                         TypeArgument(delegateTypeName)),
-                    Argument(methodName)));
+                    Argument(nativeMethodName)));
             var fieldVariableDeclarator = SyntaxFactory.VariableDeclarator(
                 Identifier(fieldName),
                 null,
@@ -205,8 +206,7 @@ namespace extern_nll_gen
         internal static ArgumentListSyntax FromParams(ParameterListSyntax paramList)
         {
             var parameters = paramList.ChildNodes()
-                .Select(n => n as ParameterSyntax)
-                .Where(n => n != null);
+                .OfType<ParameterSyntax>();
             var arguments = SyntaxFactory.SeparatedList<ArgumentSyntax>(
                     parameters.Select(param =>
                     {
@@ -247,10 +247,28 @@ namespace extern_nll_gen
         {
             var methodName = method.Identifier.Text;
             var paramTypes = method.ParameterList.ChildNodes()
-                .Select(n => n as ParameterSyntax)
-                .Where(n => n != null)
+                .OfType<ParameterSyntax>()
                 .Select(p => Slugify(p.Type.ToString().Replace('*', 'P')));
             return $"{methodName}_{string.Join('_', paramTypes)}_t";
+        }
+
+        internal static string TryGetNativeName(MethodDeclarationSyntax method)
+        {
+            var dllImportAttribute = method.AttributeLists
+                .SelectMany(list => list.Attributes)
+                .Where(attr => attr.Name.ToString() == "DllImport")
+                .FirstOrDefault();
+            if (dllImportAttribute == null) return null;
+
+            var attrs = dllImportAttribute.ArgumentList
+                .ToString();
+            var matches = EntryPointRegex.Match(attrs);
+            if (!matches.Success) return null;
+            var firstGroup = matches.Groups
+                .Skip(1)
+                .FirstOrDefault();
+            if (firstGroup == null) return null;
+            return firstGroup.Value;
         }
 
         internal static string Slugify(string str) =>
