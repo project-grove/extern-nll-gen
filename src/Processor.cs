@@ -113,12 +113,11 @@ namespace extern_nll_gen
             );
 
             // public static T MethodName(...) => s_MethodName_t(...);
+            var modifiers = new SyntaxTokenList(source.Modifiers
+                .Where(token => token.Kind() != SyntaxKind.ExternKeyword));
             var @method = SyntaxFactory.MethodDeclaration(
                 Empty<AttributeListSyntax>(),
-                new SyntaxTokenList(
-                    Token(SyntaxKind.PublicKeyword),
-                    Token(SyntaxKind.StaticKeyword)
-                ),
+                modifiers,
                 @delegate.ReturnType,
                 null,
                 Identifier(methodName),
@@ -259,7 +258,7 @@ namespace extern_nll_gen
                 .Where(attr => attr.Name.ToString() == "DllImport")
                 .FirstOrDefault();
             if (dllImportAttribute == null) return null;
-
+            if (dllImportAttribute.ArgumentList == null) return null;
             var attrs = dllImportAttribute.ArgumentList
                 .ToString();
             var matches = EntryPointRegex.Match(attrs);
