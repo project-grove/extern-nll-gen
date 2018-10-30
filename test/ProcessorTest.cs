@@ -137,6 +137,22 @@ namespace test
             Assert.Contains(method2, processedSource);
         }
 
-        // TODO Test DllImport function names
+        [Fact]
+        public void ShouldSupportDllImportEntryPoints()
+        {
+            var source = @"
+                public static class NativeClass
+                {
+                    [DllImport(\""mylib\"", EntryPoint = \""native_method\"")]
+                    public static extern void Method(int val);
+                }";
+            var processedSource = Process(source, mangle: false);
+            var method = "public static void Method(int val) => s_Method_t(val);";
+            var field = "private static Method_t s_Method_t = " +
+                    $"{Processor.LoadFunctionName}<Method_t>(\"native_method\");";
+
+            Assert.Contains(method, processedSource);
+            Assert.Contains(field, processedSource);
+        }
     }
 }
