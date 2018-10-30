@@ -68,7 +68,7 @@ public static extern int myFun(int param);
 
 The last step is probably the hardest part of the whole process.
 
-Well, to be honest, it's not that hard. There is a [ready-to-use library for it]().
+Well, to be honest, it's not that hard. There is a [ready-to-use library for it](https://github.com/mellinoe/nativelibraryloader).
 
 Here is an example from the [SDL2 wrapper](https://github.com/project-grove/SDL2.NETCore):
 ```csharp
