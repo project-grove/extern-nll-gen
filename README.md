@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # What is that?
 It's a .NET CLI tool to transform this:
 ```csharp
@@ -143,7 +142,3 @@ Extern is for ``extern`` methods.
 nll is for NativeLibraryLoader.
 
 gen is for generate.
-=======
-# extern-nll-gen
-Generates NativeLibraryLoader bindings from extern methods.
->>>>>>> origin/master
